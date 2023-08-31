@@ -1,2 +1,2 @@
 #!/bin/bash
-ls -al /boot | cat - / && ls -al . ..
+ls -al /boot | tee boot.txt; cat boot.txt; cat . ..
