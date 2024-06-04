@@ -1,51 +1,52 @@
 #!/usr/bin/python3
 """
-Function to count words in all hot posts of a given Reddit subreddit.
+Script to query a list of all hot posts on a given Reddit subreddit.
 """
+
 import requests
 
 
-def count_words(subreddit, word_list, after=None, counts=None):
+def recurse(subreddit, hot_list=[], after="", count=0):
     """
-    Recursive function that queries the Reddit API, parses the title of all
-    hot articles, and prints a sorted count of given keywords.
+    Recursively retrieves a list of titles of all hot posts
+    on a given subreddit.
+
+    Args:
+        subreddit (str): The name of the subreddit.
+        hot_list (list, optional): List to store the post titles.
+                                   Default is an empty list.
+        after (str, optional): Token used for pagination.
+                               Default is an empty string.
+        count (int, optional): Current count of retrieved posts.
+                               Default is 0.
+
+    Returns:
+        list: A list of post titles from the hot section of the subreddit.
     """
-    if counts is None:
-        counts = {}
+    url = "https://www.reddit.com/r/{}/hot/.json".format(subreddit)
+    headers = {
+        "User-Agent": "linux:0x16.api.advanced:v1.0.0 (by /u/bdov_)"
+    }
+    params = {
+        "after": after,
+        "count": count,
+        "limit": 100
+    }
 
-    if not word_list or not subreddit:
-        return
+    response = requests.get(url, headers=headers, params=params,
+                            allow_redirects=False)
 
-    url = f"https://www.reddit.com/r/{subreddit}/hot.json"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    params = {"limit": 100}
+    if response.status_code == 404:
+        return None
 
-    if after:
-        params["after"] = after
+    results = response.json().get("data")
+    after = results.get("after")
+    count += results.get("dist")
 
-    response = requests.get(
-        url,
-        headers=headers,
-        params=params,
-        allow_redirects=False
-    )
+    for c in results.get("children"):
+        hot_list.append(c.get("data").get("title"))
 
-    if response.status_code != 200:
-        return
+    if after is not None:
+        return recurse(subreddit, hot_list, after, count)
 
-    data = response.json()
-    children = data["data"]["children"]
-
-    for post in children:
-        title = post["data"]["title"].lower()
-        for word in word_list:
-            if word.lower() in title:
-                counts[word] = counts.get(word, 0) + title.count(word.lower())
-
-    after = data["data"]["after"]
-    if after:
-        count_words(subreddit, word_list, after, counts)
-    else:
-        sorted_counts = sorted(counts.items(), key=lambda x: (-x[1], x[0].lower()))
-        for word, count in sorted_counts:
-            print(f"{word.lower()}: {count}")
+    return hot_list
